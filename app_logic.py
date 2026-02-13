@@ -5,7 +5,7 @@ from mapping import mapping
 
 
 # =========================
-# Helper: normalisasi teks
+# Helper
 # =========================
 def clean_text(s):
     if not s:
@@ -22,18 +22,25 @@ def safe_int(value):
 
 # =========================
 # STEP 1: Filter laporan dari chat text
+# Tambah proteksi error
 # =========================
 def filter_orderan_from_text(text):
+    if not text:
+        return []
+
     lines = text.splitlines()
 
     reports = []
     buffer = []
 
     for line in lines:
-        if " - " in line and ":" in line:
-            msg = line.split(":", 1)[1].strip()
-        else:
-            msg = line.strip()
+        try:
+            if " - " in line and ":" in line:
+                msg = line.split(":", 1)[1].strip()
+            else:
+                msg = line.strip()
+        except:
+            continue
 
         if msg.startswith("Shift"):
             if buffer:
@@ -50,15 +57,23 @@ def filter_orderan_from_text(text):
 
 
 # =========================
-# STEP 2: Parsing laporan
+# STEP 2: Parsing laporan (AMAN)
 # =========================
 def parse_report(text):
     data = {}
-    for line in text.splitlines():
+
+    if not text:
+        return data
+
+    for line in str(text).splitlines():
         if ":" in line:
-            key, val = line.split(":", 1)
-            key = key.strip().lower().replace(" ", "")
-            data[key] = val.strip()
+            try:
+                key, val = line.split(":", 1)
+                key = key.strip().lower().replace(" ", "")
+                data[key] = val.strip()
+            except:
+                continue
+
     return data
 
 
@@ -85,13 +100,17 @@ def isi_template(template_path, chat_text, tanggal_target, output_file):
     ws["A1"] = f"HARI/TANGGAL : {hari_id[tanggal.strftime('%A')]} {tanggal.strftime('%d %B %Y')}"
 
     for rep in reports:
+
+        if not rep.strip():
+            continue   # skip laporan kosong
+
         data = parse_report(rep)
 
         shift = data.get("shift", "")
         kode_rute_input = clean_text(data.get("koderute", ""))
 
-        no_body_raw = data.get("nobody", "").upper()   # ditulis ke Excel pakai spasi
-        no_body_clean = clean_text(no_body_raw)        # untuk pencocokan
+        no_body_raw = data.get("nobody", "").upper()
+        no_body_clean = clean_text(no_body_raw)
 
         tob_fp = safe_int(data.get("tobfp"))
         tob_ep = safe_int(data.get("tobep"))
@@ -101,7 +120,12 @@ def isi_template(template_path, chat_text, tanggal_target, output_file):
         if not kode_rute_input:
             continue
 
-        best_match, score, _ = process.extractOne(kode_rute_input, mapping.keys())
+        best_match = process.extractOne(kode_rute_input, mapping.keys())
+
+        if not best_match:
+            continue
+
+        best_match, score, _ = best_match
 
         if score < 80:
             continue
@@ -109,14 +133,14 @@ def isi_template(template_path, chat_text, tanggal_target, output_file):
         rows = mapping[best_match]
         target_row = None
 
-        # 1. cari baris dengan no body yang sama (untuk shift 2)
+        # cari baris no body yang sama (shift 2)
         for r in rows:
             cell_value = ws[f"C{r}"].value
             if clean_text(cell_value) == no_body_clean:
                 target_row = r
                 break
 
-        # 2. jika belum ada, cari baris kosong (untuk shift 1)
+        # cari baris kosong (shift 1)
         if not target_row:
             for r in rows:
                 if ws[f"C{r}"].value in (None, ""):
@@ -126,7 +150,6 @@ def isi_template(template_path, chat_text, tanggal_target, output_file):
         if not target_row:
             continue
 
-        # isi sesuai shift
         if shift == "1":
             ws[f"C{target_row}"] = no_body_raw
             ws[f"D{target_row}"] = tob_fp
