@@ -3,6 +3,7 @@ from openpyxl import load_workbook
 from rapidfuzz import process
 from mapping import mapping
 
+
 # =========================
 # Helper: normalisasi teks
 # =========================
@@ -10,6 +11,13 @@ def clean_text(s):
     if not s:
         return ""
     return str(s).replace(" ", "").replace("\n", "").upper()
+
+
+def safe_int(value):
+    try:
+        return int(str(value).strip())
+    except:
+        return 0
 
 
 # =========================
@@ -82,13 +90,13 @@ def isi_template(template_path, chat_text, tanggal_target, output_file):
         shift = data.get("shift", "")
         kode_rute_input = clean_text(data.get("koderute", ""))
 
-        no_body_raw = data.get("nobody", "").upper()
-        no_body_clean = clean_text(no_body_raw)
+        no_body_raw = data.get("nobody", "").upper()   # ditulis ke Excel pakai spasi
+        no_body_clean = clean_text(no_body_raw)        # untuk pencocokan
 
-        tob_fp = int(data.get("tobfp", 0))
-        tob_ep = int(data.get("tobep", 0))
-        tob_lg = int(data.get("toblg", 0))
-        tap_out = int(data.get("tapout", 0))
+        tob_fp = safe_int(data.get("tobfp"))
+        tob_ep = safe_int(data.get("tobep"))
+        tob_lg = safe_int(data.get("toblg"))
+        tap_out = safe_int(data.get("tapout"))
 
         if not kode_rute_input:
             continue
@@ -101,12 +109,14 @@ def isi_template(template_path, chat_text, tanggal_target, output_file):
         rows = mapping[best_match]
         target_row = None
 
+        # 1. cari baris dengan no body yang sama (untuk shift 2)
         for r in rows:
             cell_value = ws[f"C{r}"].value
             if clean_text(cell_value) == no_body_clean:
                 target_row = r
                 break
 
+        # 2. jika belum ada, cari baris kosong (untuk shift 1)
         if not target_row:
             for r in rows:
                 if ws[f"C{r}"].value in (None, ""):
@@ -116,6 +126,7 @@ def isi_template(template_path, chat_text, tanggal_target, output_file):
         if not target_row:
             continue
 
+        # isi sesuai shift
         if shift == "1":
             ws[f"C{target_row}"] = no_body_raw
             ws[f"D{target_row}"] = tob_fp
