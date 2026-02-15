@@ -1,10 +1,11 @@
 import datetime
 import re
 from openpyxl import load_workbook
+from openpyxl.cell.cell import MergedCell
 from rapidfuzz import process
 from mapping import mapping
 
-print("APP_LOGIC VERSION 2026-02-15 AUTO CLEAR TEMPLATE")
+print("APP_LOGIC VERSION 2026-02-15 FINAL MERGED SAFE")
 
 # =========================
 # Helper normalization
@@ -20,8 +21,16 @@ def normalize_key(s):
 def safe_int(val):
     if not val:
         return 0
-    val = re.sub(r"[^0-9]", "", val)
+    val = re.sub(r"[^0-9]", "", str(val))
     return int(val) if val else 0
+
+
+# =========================
+# Safe clear cell (anti merged error)
+# =========================
+def safe_clear_cell(ws, cell):
+    if not isinstance(ws[cell], MergedCell):
+        ws[cell] = None
 
 
 # =========================
@@ -59,12 +68,15 @@ def parse_report(text):
     data = {}
 
     for line in text.splitlines():
+        line = line.strip()
+
         if ":" in line:
             key, val = line.split(":", 1)
             key = normalize_key(key)
             val = val.strip()
             data[key] = val
         else:
+            # handle format "Shift 2"
             m = re.match(r"(shift)\s*(\d)", line.lower())
             if m:
                 data["shift"] = m.group(2)
@@ -73,7 +85,7 @@ def parse_report(text):
 
 
 # =========================
-# STEP 3: Isi template (AUTO CLEAR)
+# STEP 3: Isi template
 # =========================
 def isi_template(template_path, chat_text, tanggal_target, output_file):
     reports = filter_orderan_from_text(chat_text)
@@ -82,17 +94,11 @@ def isi_template(template_path, chat_text, tanggal_target, output_file):
     ws = wb.active
 
     # =========================
-    # CLEAR TEMPLATE (ONE TASK KILLER)
+    # CLEAR TEMPLATE FIRST (SAFE)
     # =========================
     for row in range(1, ws.max_row + 1):
-        ws[f"C{row}"] = None
-        ws[f"D{row}"] = None
-        ws[f"E{row}"] = None
-        ws[f"F{row}"] = None
-        ws[f"L{row}"] = None
-        ws[f"M{row}"] = None
-        ws[f"N{row}"] = None
-        ws[f"O{row}"] = None
+        for col in ["C", "D", "E", "F", "L", "M", "N", "O"]:
+            safe_clear_cell(ws, f"{col}{row}")
 
     print("TEMPLATE CLEARED")
 
@@ -113,7 +119,7 @@ def isi_template(template_path, chat_text, tanggal_target, output_file):
     ws["A1"] = f"HARI/TANGGAL : {hari_id[tanggal.strftime('%A')]} {tanggal.strftime('%d %B %Y')}"
 
     # =========================
-    # Isi data dari chat
+    # Proses laporan
     # =========================
     for rep in reports:
         data = parse_report(rep)
@@ -121,7 +127,7 @@ def isi_template(template_path, chat_text, tanggal_target, output_file):
         shift = data.get("shift", "").strip()
         kode_rute_input = normalize_text(data.get("koderute", ""))
 
-        no_body_raw = data.get("nobody", "").upper()
+        no_body_raw = data.get("nobody", "")
         no_body_clean = normalize_text(no_body_raw)
 
         tob_fp = safe_int(data.get("tobfp"))
@@ -141,14 +147,14 @@ def isi_template(template_path, chat_text, tanggal_target, output_file):
         rows = mapping[best_match]
         target_row = None
 
-        # cari body sama
+        # Cari body yang sama
         for r in rows:
             cell_val = ws[f"C{r}"].value
             if normalize_text(cell_val) == no_body_clean:
                 target_row = r
                 break
 
-        # cari slot kosong
+        # Cari slot kosong
         if not target_row:
             for r in rows:
                 if ws[f"C{r}"].value in (None, ""):
@@ -159,8 +165,11 @@ def isi_template(template_path, chat_text, tanggal_target, output_file):
             print("NO SLOT:", best_match, no_body_clean)
             continue
 
+        # =========================
+        # Tulis ke Excel
+        # =========================
         if shift == "1":
-            ws[f"C{target_row}"] = no_body_raw
+            ws[f"C{target_row}"] = no_body_raw.upper()
             ws[f"D{target_row}"] = tob_fp
             ws[f"E{target_row}"] = tob_ep
             ws[f"F{target_row}"] = tob_lg
@@ -172,4 +181,5 @@ def isi_template(template_path, chat_text, tanggal_target, output_file):
             ws[f"O{target_row}"] = tob_lg
 
     wb.save(output_file)
+    print("FILE SAVED:", output_file)
     return output_file
