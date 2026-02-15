@@ -40,40 +40,40 @@ def filter_orderan_from_text(text, tanggal_target):
     lines = text.splitlines()
     reports = []
     buffer = []
-    capture = False
+    active = False
+
+    # contoh: tanggal_target = "15/02/26"
+    tanggal_regex = re.escape(tanggal_target)
 
     for line in lines:
-        # contoh: 15/02/26, 08:20 - Nama: Shift 1
-        if re.match(rf"^{tanggal_target},", line):
-            capture = True
+        # cek apakah baris ini mengandung tanggal target
+        if re.search(tanggal_regex, line):
+            active = True
+            buffer = []  # mulai blok baru
 
-        # jika ketemu tanggal lain → stop capture
-        elif re.match(r"\d{2}/\d{2}/\d{2},", line):
-            capture = False
+        # jika sudah aktif (tanggal cocok)
+        if active:
+            # ambil hanya isi pesan
+            if " - " in line and ":" in line:
+                msg = line.split(":", 1)[1].strip()
+            else:
+                msg = line.strip()
 
-        if not capture:
-            continue
+            # jika ketemu shift baru, simpan laporan sebelumnya
+            if re.match(r"^shift", msg.lower()):
+                if buffer:
+                    reports.append("\n".join(buffer))
+                    buffer = []
 
-        # ambil pesan setelah "Nama:"
-        if " - " in line and ":" in line:
-            msg = line.split(":", 1)[1].strip()
-        else:
-            msg = line.strip()
-
-        # deteksi shift baru
-        if re.match(r"^shift", msg.lower()):
-            if buffer:
-                reports.append("\n".join(buffer))
-                buffer = []
-
-        if msg:
-            buffer.append(msg)
+            if msg:
+                buffer.append(msg)
 
     if buffer:
         reports.append("\n".join(buffer))
 
-    print("TOTAL REPORT FOUND:", len(reports))
+    print(f"TOTAL REPORT FOUND: {len(reports)}")
     return reports
+
 
 
 # =========================
@@ -198,3 +198,4 @@ def isi_template(template_path, chat_text, tanggal_target, output_file):
     wb.save(output_file)
     print("FILE SAVED:", output_file)
     return output_file
+
