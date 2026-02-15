@@ -18,7 +18,7 @@ if uploaded_file and tanggal_target:
         with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp:
             output_file = tmp.name
 
-        template_path = "template_rusun.xlsx"
+        template_path = "template_bersih.xlsx"
 
         isi_template(template_path, chat_text, tanggal_target, output_file)
 
@@ -31,3 +31,4 @@ if uploaded_file and tanggal_target:
             )
 
         st.success("File berhasil dibuat!")
+
