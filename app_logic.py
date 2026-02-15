@@ -5,7 +5,7 @@ from openpyxl.cell.cell import MergedCell
 from rapidfuzz import process
 from mapping import mapping
 
-print("APP_LOGIC VERSION 2026-02-16 CHAT FORMAT FIX")
+print("APP_LOGIC VERSION 2026-02-16 BODY_ROW_MAP FIX")
 
 # =========================
 # Helper
@@ -24,14 +24,13 @@ def safe_int(val):
     val = re.sub(r"[^0-9]", "", str(val))
     return int(val) if val else 0
 
-
 def safe_clear_cell(ws, cell):
     if not isinstance(ws[cell], MergedCell):
         ws[cell] = None
 
 
 # =========================
-# STEP 1: Filter chat by DATE (sesuai format kamu)
+# STEP 1: Filter chat by DATE
 # =========================
 def filter_orderan_from_text(text, tanggal_target):
     lines = text.splitlines()
@@ -39,7 +38,6 @@ def filter_orderan_from_text(text, tanggal_target):
     buffer = []
     active = False
 
-    # format: 15/02/26 12.18 - Nama:
     date_pattern = re.compile(r"^(\d{2}/\d{2}/\d{2})\s+\d{2}\.\d{2}\s+-")
 
     for line in lines:
@@ -50,32 +48,27 @@ def filter_orderan_from_text(text, tanggal_target):
         if m:
             tanggal_line = m.group(1)
 
-            # jika tanggal tidak cocok → matikan active
             if tanggal_line != tanggal_target:
                 active = False
                 continue
             else:
                 active = True
 
-            # ambil pesan setelah ":"
             if ":" in line:
                 msg = line.split(":", 1)[1].strip()
             else:
                 msg = ""
-
         else:
             msg = line
 
         if not active:
             continue
 
-        # skip noise
         if msg.lower().startswith("<media"):
             continue
         if "pesan ini dihapus" in msg.lower():
             continue
 
-        # jika ketemu shift baru → simpan laporan sebelumnya
         if re.match(r"^shift", msg.lower()):
             if buffer:
                 reports.append("\n".join(buffer))
@@ -114,7 +107,7 @@ def parse_report(text):
 
 
 # =========================
-# STEP 3: Isi template
+# STEP 3: Isi template (FIXED)
 # =========================
 def isi_template(template_path, chat_text, tanggal_target, output_file):
     reports = filter_orderan_from_text(chat_text, tanggal_target)
@@ -122,15 +115,16 @@ def isi_template(template_path, chat_text, tanggal_target, output_file):
     wb = load_workbook(template_path)
     ws = wb.active
 
-    # CLEAR TEMPLATE
     DATA_START_ROW = 6
+
+    # CLEAR DATA (tanpa rusak merged cell)
     for row in range(DATA_START_ROW, ws.max_row + 1):
         for col in ["C", "D", "E", "F", "L", "M", "N", "O"]:
             safe_clear_cell(ws, f"{col}{row}")
 
     print("TEMPLATE CLEARED")
 
-    # Header tanggal
+    # HEADER tanggal
     tanggal = datetime.datetime.strptime(tanggal_target, "%d/%m/%y").date()
     hari_id = {
         "Monday": "Senin",
@@ -143,6 +137,11 @@ def isi_template(template_path, chat_text, tanggal_target, output_file):
     }
 
     ws["A1"] = f"HARI/TANGGAL : {hari_id[tanggal.strftime('%A')]} {tanggal.strftime('%d %B %Y')}"
+
+    # =========================
+    # BODY ROW MAP (KUNCI FIX)
+    # =========================
+    body_row_map = {}
 
     # Proses laporan
     for rep in reports:
@@ -169,23 +168,36 @@ def isi_template(template_path, chat_text, tanggal_target, output_file):
             continue
 
         rows = mapping[best_match]
+
+        key = (best_match, no_body_clean)
         target_row = None
 
-        for r in rows:
-            if normalize_text(ws[f"C{r}"].value) == no_body_clean:
-                target_row = r
-                break
-
-        if not target_row:
+        # Jika sudah pernah dicatat
+        if key in body_row_map:
+            target_row = body_row_map[key]
+        else:
+            # cari di excel
             for r in rows:
-                if ws[f"C{r}"].value in (None, ""):
+                if normalize_text(ws[f"C{r}"].value) == no_body_clean:
                     target_row = r
                     break
 
-        if not target_row:
-            print("NO SLOT:", best_match, no_body_clean)
-            continue
+            # cari slot kosong
+            if not target_row:
+                for r in rows:
+                    if ws[f"C{r}"].value in (None, ""):
+                        target_row = r
+                        break
 
+            if not target_row:
+                print("NO SLOT:", best_match, no_body_clean)
+                continue
+
+            body_row_map[key] = target_row
+
+        # =========================
+        # TULIS DATA
+        # =========================
         if shift == "1":
             ws[f"C{target_row}"] = no_body_raw.upper()
             ws[f"D{target_row}"] = tob_fp
@@ -201,4 +213,3 @@ def isi_template(template_path, chat_text, tanggal_target, output_file):
     wb.save(output_file)
     print("FILE SAVED:", output_file)
     return output_file
-
