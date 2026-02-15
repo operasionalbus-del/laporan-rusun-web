@@ -95,14 +95,17 @@ st.markdown(f"""
     padding: 2rem;
     border-radius: 20px;
     text-align: center;
+    margin-bottom: 20px;
 }}
+
 .header-box img {{
-    width: 80px;
+    width: 90px;
     margin-bottom: 10px;
 }}
 </style>
 
 <div class="header-box">
+    <img src="data:image/png;base64,{logo_base64}">
     <h1>Web App Laporan TOB Rute Integrasi Rusun</h1>
     <p>Upload chat WhatsApp & generate Excel otomatis</p>
 </div>
@@ -173,6 +176,7 @@ if uploaded_file and tanggal_target:
 # =========================
 st.markdown("---")
 st.caption("Developed for Laporan Rusun • 2026")
+
 
 
 
