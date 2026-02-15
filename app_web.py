@@ -5,6 +5,10 @@ import base64
 import os
 from datetime import datetime
 
+#Buat Logo
+def get_base64_image(image_path):
+    with open(image_path, "rb") as img_file:
+        return base64.b64encode(img_file.read()).decode()
 
 # =========================
 # SET PAGE
@@ -82,6 +86,8 @@ set_background("rusun oke.jpg")
 # =========================
 # HEADER
 # =========================
+logo_base64 = get_base64_image("logo.png")
+
 st.markdown("""
 <div class="header-box">
     <img src="tap.png">
@@ -155,6 +161,7 @@ if uploaded_file and tanggal_target:
 # =========================
 st.markdown("---")
 st.caption("Developed for Laporan Rusun • 2026")
+
 
 
 
