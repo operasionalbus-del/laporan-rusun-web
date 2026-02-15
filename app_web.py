@@ -1,156 +1,33 @@
-import datetime
-import re
-from openpyxl import load_workbook
-from rapidfuzz import process
-from mapping import mapping
+import streamlit as st
+from app_logic import isi_template
+import tempfile
 
-print("APP_LOGIC VERSION 2026-02-15 FINAL ROBUST")
+st.set_page_config(page_title="Laporan Rusun", layout="centered")
 
-# =========================
-# Helper normalization
-# =========================
-def normalize_text(s):
-    if not s:
-        return ""
-    return re.sub(r"[^A-Z0-9]", "", str(s).upper())
+st.title("📊 Web App Laporan Rusun")
+st.write("Upload chat WhatsApp & generate Excel otomatis")
 
-def normalize_key(s):
-    return re.sub(r"[^a-z]", "", s.lower())
+tanggal_target = st.text_input("Masukkan tanggal (dd/mm/yy)", "12/02/26")
 
-def safe_int(val):
-    if not val:
-        return 0
-    val = re.sub(r"[^0-9]", "", val)
-    return int(val) if val else 0
+uploaded_file = st.file_uploader("Upload file chat WhatsApp (.txt)", type=["txt"])
 
+if uploaded_file and tanggal_target:
+    chat_text = uploaded_file.read().decode("utf-8")
 
-# =========================
-# STEP 1: Filter laporan
-# =========================
-def filter_orderan_from_text(text):
-    lines = text.splitlines()
-    reports = []
-    buffer = []
+    if st.button("🚀 Generate Excel"):
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp:
+            output_file = tmp.name
 
-    for line in lines:
-        if " - " in line and ":" in line:
-            msg = line.split(":", 1)[1].strip()
-        else:
-            msg = line.strip()
+        template_path = "template_rusun.xlsx"
 
-        if re.match(r"^shift", msg.lower()):
-            if buffer:
-                reports.append("\n".join(buffer))
-                buffer = []
+        isi_template(template_path, chat_text, tanggal_target, output_file)
 
-        if msg:
-            buffer.append(msg)
+        with open(output_file, "rb") as f:
+            st.download_button(
+                label="📥 Download laporan Excel",
+                data=f,
+                file_name="laporan_otomatis.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
 
-    if buffer:
-        reports.append("\n".join(buffer))
-
-    return reports
-
-
-# =========================
-# STEP 2: Parsing fleksibel
-# =========================
-def parse_report(text):
-    data = {}
-
-    for line in text.splitlines():
-        if ":" in line:
-            key, val = line.split(":", 1)
-            key = normalize_key(key)
-            val = val.strip()
-            data[key] = val
-
-        else:
-            # handle format "Shift 2"
-            m = re.match(r"(shift)\s*(\d)", line.lower())
-            if m:
-                data["shift"] = m.group(2)
-
-    return data
-
-
-# =========================
-# STEP 3: Isi template
-# =========================
-def isi_template(template_path, chat_text, tanggal_target, output_file):
-    reports = filter_orderan_from_text(chat_text)
-
-    wb = load_workbook(template_path)
-    ws = wb.active
-
-    tanggal = datetime.datetime.strptime(tanggal_target, "%d/%m/%y").date()
-    hari_id = {
-        "Monday": "Senin",
-        "Tuesday": "Selasa",
-        "Wednesday": "Rabu",
-        "Thursday": "Kamis",
-        "Friday": "Jumat",
-        "Saturday": "Sabtu",
-        "Sunday": "Minggu"
-    }
-
-    ws["A1"] = f"HARI/TANGGAL : {hari_id[tanggal.strftime('%A')]} {tanggal.strftime('%d %B %Y')}"
-
-    for rep in reports:
-        data = parse_report(rep)
-
-        shift = data.get("shift", "").strip()
-        kode_rute_input = normalize_text(data.get("koderute", ""))
-
-        no_body_raw = data.get("nobody", "").upper()
-        no_body_clean = normalize_text(no_body_raw)
-
-        tob_fp = safe_int(data.get("tobfp"))
-        tob_ep = safe_int(data.get("tobep"))
-        tob_lg = safe_int(data.get("toblg"))
-        tap_out = safe_int(data.get("tapout"))
-
-        if not kode_rute_input or not no_body_clean:
-            continue
-
-        best_match, score, _ = process.extractOne(kode_rute_input, mapping.keys())
-
-        if score < 70:
-            print("SKIP ROUTE:", kode_rute_input)
-            continue
-
-        rows = mapping[best_match]
-        target_row = None
-
-        # cari baris body sama
-        for r in rows:
-            cell_val = ws[f"C{r}"].value
-            if normalize_text(cell_val) == no_body_clean:
-                target_row = r
-                break
-
-        # cari baris kosong jika belum ada
-        if not target_row:
-            for r in rows:
-                if ws[f"C{r}"].value in (None, ""):
-                    target_row = r
-                    break
-
-        if not target_row:
-            print("NO SLOT:", best_match, no_body_clean)
-            continue
-
-        if shift == "1":
-            ws[f"C{target_row}"] = no_body_raw
-            ws[f"D{target_row}"] = tob_fp
-            ws[f"E{target_row}"] = tob_ep
-            ws[f"F{target_row}"] = tob_lg
-
-        elif shift == "2":
-            ws[f"M{target_row}"] = tob_fp
-            ws[f"N{target_row}"] = tob_ep
-            ws[f"O{target_row}"] = tob_lg
-            ws[f"L{target_row}"] = tap_out
-
-    wb.save(output_file)
-    return output_file
+        st.success("File berhasil dibuat!")
