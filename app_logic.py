@@ -4,7 +4,7 @@ from openpyxl import load_workbook
 from rapidfuzz import process
 from mapping import mapping
 
-print("APP_LOGIC VERSION 2026-02-15 FINAL ROBUST")
+print("APP_LOGIC VERSION 2026-02-15 AUTO CLEAR TEMPLATE")
 
 # =========================
 # Helper normalization
@@ -64,9 +64,7 @@ def parse_report(text):
             key = normalize_key(key)
             val = val.strip()
             data[key] = val
-
         else:
-            # handle format "Shift 2"
             m = re.match(r"(shift)\s*(\d)", line.lower())
             if m:
                 data["shift"] = m.group(2)
@@ -75,7 +73,7 @@ def parse_report(text):
 
 
 # =========================
-# STEP 3: Isi template
+# STEP 3: Isi template (AUTO CLEAR)
 # =========================
 def isi_template(template_path, chat_text, tanggal_target, output_file):
     reports = filter_orderan_from_text(chat_text)
@@ -83,6 +81,24 @@ def isi_template(template_path, chat_text, tanggal_target, output_file):
     wb = load_workbook(template_path)
     ws = wb.active
 
+    # =========================
+    # CLEAR TEMPLATE (ONE TASK KILLER)
+    # =========================
+    for row in range(1, ws.max_row + 1):
+        ws[f"C{row}"] = None
+        ws[f"D{row}"] = None
+        ws[f"E{row}"] = None
+        ws[f"F{row}"] = None
+        ws[f"L{row}"] = None
+        ws[f"M{row}"] = None
+        ws[f"N{row}"] = None
+        ws[f"O{row}"] = None
+
+    print("TEMPLATE CLEARED")
+
+    # =========================
+    # Header tanggal
+    # =========================
     tanggal = datetime.datetime.strptime(tanggal_target, "%d/%m/%y").date()
     hari_id = {
         "Monday": "Senin",
@@ -96,6 +112,9 @@ def isi_template(template_path, chat_text, tanggal_target, output_file):
 
     ws["A1"] = f"HARI/TANGGAL : {hari_id[tanggal.strftime('%A')]} {tanggal.strftime('%d %B %Y')}"
 
+    # =========================
+    # Isi data dari chat
+    # =========================
     for rep in reports:
         data = parse_report(rep)
 
@@ -122,14 +141,14 @@ def isi_template(template_path, chat_text, tanggal_target, output_file):
         rows = mapping[best_match]
         target_row = None
 
-        # cari baris body sama
+        # cari body sama
         for r in rows:
             cell_val = ws[f"C{r}"].value
             if normalize_text(cell_val) == no_body_clean:
                 target_row = r
                 break
 
-        # cari baris kosong jika belum ada
+        # cari slot kosong
         if not target_row:
             for r in rows:
                 if ws[f"C{r}"].value in (None, ""):
@@ -147,10 +166,10 @@ def isi_template(template_path, chat_text, tanggal_target, output_file):
             ws[f"F{target_row}"] = tob_lg
 
         elif shift == "2":
+            ws[f"L{target_row}"] = tap_out
             ws[f"M{target_row}"] = tob_fp
             ws[f"N{target_row}"] = tob_ep
             ws[f"O{target_row}"] = tob_lg
-            ws[f"L{target_row}"] = tap_out
 
     wb.save(output_file)
     return output_file
