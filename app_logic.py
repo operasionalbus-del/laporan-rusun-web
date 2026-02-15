@@ -5,10 +5,10 @@ from openpyxl.cell.cell import MergedCell
 from rapidfuzz import process
 from mapping import mapping
 
-print("APP_LOGIC VERSION 2026-02-16 DATE FILTER + MERGED SAFE")
+print("APP_LOGIC VERSION 2026-02-16 CHAT FORMAT FIX")
 
 # =========================
-# Helper normalization
+# Helper
 # =========================
 def normalize_text(s):
     if not s:
@@ -25,16 +25,13 @@ def safe_int(val):
     return int(val) if val else 0
 
 
-# =========================
-# Safe clear cell (anti merged error)
-# =========================
 def safe_clear_cell(ws, cell):
     if not isinstance(ws[cell], MergedCell):
         ws[cell] = None
 
 
 # =========================
-# STEP 1: Filter chat by DATE
+# STEP 1: Filter chat by DATE (sesuai format kamu)
 # =========================
 def filter_orderan_from_text(text, tanggal_target):
     lines = text.splitlines()
@@ -42,42 +39,60 @@ def filter_orderan_from_text(text, tanggal_target):
     buffer = []
     active = False
 
-    # contoh: tanggal_target = "15/02/26"
-    tanggal_regex = re.escape(tanggal_target)
+    # format: 15/02/26 12.18 - Nama:
+    date_pattern = re.compile(r"^(\d{2}/\d{2}/\d{2})\s+\d{2}\.\d{2}\s+-")
 
     for line in lines:
-        # cek apakah baris ini mengandung tanggal target
-        if re.search(tanggal_regex, line):
-            active = True
-            buffer = []  # mulai blok baru
+        line = line.strip()
 
-        # jika sudah aktif (tanggal cocok)
-        if active:
-            # ambil hanya isi pesan
-            if " - " in line and ":" in line:
+        m = date_pattern.match(line)
+
+        if m:
+            tanggal_line = m.group(1)
+
+            # jika tanggal tidak cocok → matikan active
+            if tanggal_line != tanggal_target:
+                active = False
+                continue
+            else:
+                active = True
+
+            # ambil pesan setelah ":"
+            if ":" in line:
                 msg = line.split(":", 1)[1].strip()
             else:
-                msg = line.strip()
+                msg = ""
 
-            # jika ketemu shift baru, simpan laporan sebelumnya
-            if re.match(r"^shift", msg.lower()):
-                if buffer:
-                    reports.append("\n".join(buffer))
-                    buffer = []
+        else:
+            msg = line
 
-            if msg:
-                buffer.append(msg)
+        if not active:
+            continue
+
+        # skip noise
+        if msg.lower().startswith("<media"):
+            continue
+        if "pesan ini dihapus" in msg.lower():
+            continue
+
+        # jika ketemu shift baru → simpan laporan sebelumnya
+        if re.match(r"^shift", msg.lower()):
+            if buffer:
+                reports.append("\n".join(buffer))
+                buffer = []
+
+        if msg:
+            buffer.append(msg)
 
     if buffer:
         reports.append("\n".join(buffer))
 
-    print(f"TOTAL REPORT FOUND: {len(reports)}")
+    print("TOTAL REPORT FOUND:", len(reports))
     return reports
 
 
-
 # =========================
-# STEP 2: Parsing fleksibel
+# STEP 2: Parsing laporan
 # =========================
 def parse_report(text):
     data = {}
@@ -91,10 +106,9 @@ def parse_report(text):
             val = val.strip()
             data[key] = val
         else:
-            # handle "Shift 2"
-            m = re.match(r"(shift)\s*(\d)", line.lower())
+            m = re.match(r"(shift)\s*:?(\s*\d)", line.lower())
             if m:
-                data["shift"] = m.group(2)
+                data["shift"] = m.group(2).strip()
 
     return data
 
@@ -108,18 +122,14 @@ def isi_template(template_path, chat_text, tanggal_target, output_file):
     wb = load_workbook(template_path)
     ws = wb.active
 
-    # =========================
-    # CLEAR TEMPLATE FIRST
-    # =========================
+    # CLEAR TEMPLATE
     for row in range(1, ws.max_row + 1):
         for col in ["C", "D", "E", "F", "L", "M", "N", "O"]:
             safe_clear_cell(ws, f"{col}{row}")
 
     print("TEMPLATE CLEARED")
 
-    # =========================
     # Header tanggal
-    # =========================
     tanggal = datetime.datetime.strptime(tanggal_target, "%d/%m/%y").date()
     hari_id = {
         "Monday": "Senin",
@@ -133,9 +143,7 @@ def isi_template(template_path, chat_text, tanggal_target, output_file):
 
     ws["A1"] = f"HARI/TANGGAL : {hari_id[tanggal.strftime('%A')]} {tanggal.strftime('%d %B %Y')}"
 
-    # =========================
     # Proses laporan
-    # =========================
     for rep in reports:
         data = parse_report(rep)
 
@@ -162,14 +170,11 @@ def isi_template(template_path, chat_text, tanggal_target, output_file):
         rows = mapping[best_match]
         target_row = None
 
-        # cari body yang sama
         for r in rows:
-            cell_val = ws[f"C{r}"].value
-            if normalize_text(cell_val) == no_body_clean:
+            if normalize_text(ws[f"C{r}"].value) == no_body_clean:
                 target_row = r
                 break
 
-        # cari slot kosong
         if not target_row:
             for r in rows:
                 if ws[f"C{r}"].value in (None, ""):
@@ -180,9 +185,6 @@ def isi_template(template_path, chat_text, tanggal_target, output_file):
             print("NO SLOT:", best_match, no_body_clean)
             continue
 
-        # =========================
-        # Tulis ke Excel
-        # =========================
         if shift == "1":
             ws[f"C{target_row}"] = no_body_raw.upper()
             ws[f"D{target_row}"] = tob_fp
@@ -198,4 +200,3 @@ def isi_template(template_path, chat_text, tanggal_target, output_file):
     wb.save(output_file)
     print("FILE SAVED:", output_file)
     return output_file
-
