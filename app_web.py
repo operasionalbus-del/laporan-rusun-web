@@ -36,10 +36,22 @@ def set_background(image_file):
         background-attachment: fixed;
     }}
 
-    .main {{
-        background-color: rgba(255,255,255,0.88);
-        padding: 2rem;
+    /* HEADER CONTAINER */
+    .header-box {{
+        background-color: rgba(200, 200, 200, 0.9);
+        padding: 20px;
         border-radius: 15px;
+        text-align: center;
+        margin-bottom: 20px;
+        box-shadow: 0px 2px 6px rgba(0,0,0,0.2);
+    }}
+
+    /* MAIN CONTENT */
+    .main-box {{
+        background-color: rgba(255,255,255,0.9);
+        padding: 25px;
+        border-radius: 15px;
+        box-shadow: 0px 2px 6px rgba(0,0,0,0.2);
     }}
     </style>
     """
@@ -50,10 +62,20 @@ set_background("rusun oke.jpg")
 
 
 # =========================
-# HEADER
+# HEADER (WITH CONTAINER)
 # =========================
-st.title("📊 Web App Laporan TOB Rute Integrasi Rusun")
-st.write("Upload chat WhatsApp & generate Excel otomatis")
+st.markdown("""
+<div class="header-box">
+    <h1>📊 Web App Laporan TOB Rute Integrasi Rusun</h1>
+    <p>Upload chat WhatsApp & generate Excel otomatis</p>
+</div>
+""", unsafe_allow_html=True)
+
+
+# =========================
+# MAIN CONTAINER
+# =========================
+st.markdown('<div class="main-box">', unsafe_allow_html=True)
 
 
 # =========================
@@ -120,3 +142,5 @@ if uploaded_file and tanggal_target:
 # =========================
 st.markdown("---")
 st.caption("Developed for Laporan Rusun • 2026")
+
+st.markdown('</div>', unsafe_allow_html=True)
