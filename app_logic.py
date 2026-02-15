@@ -1,4 +1,5 @@
 import datetime
+import re
 from openpyxl import load_workbook
 from rapidfuzz import process
 from mapping import mapping
@@ -22,7 +23,6 @@ def safe_int(value):
 
 # =========================
 # STEP 1: Filter laporan dari chat text
-# Tambah proteksi error
 # =========================
 def filter_orderan_from_text(text):
     if not text:
@@ -42,7 +42,7 @@ def filter_orderan_from_text(text):
         except:
             continue
 
-        if msg.startswith("Shift"):
+        if msg.lower().startswith("shift"):
             if buffer:
                 reports.append("\n".join(buffer))
                 buffer = []
@@ -57,22 +57,52 @@ def filter_orderan_from_text(text):
 
 
 # =========================
-# STEP 2: Parsing laporan (AMAN)
+# STEP 2: Parsing laporan (pakai regex fleksibel)
 # =========================
 def parse_report(text):
     data = {}
-
     if not text:
         return data
 
-    for line in str(text).splitlines():
-        if ":" in line:
-            try:
-                key, val = line.split(":", 1)
-                key = key.strip().lower().replace(" ", "")
-                data[key] = val.strip()
-            except:
-                continue
+    lines = text.splitlines()
+
+    for line in lines:
+        line = line.strip()
+
+        # SHIFT (Shift 2 / Shift : 2)
+        m = re.search(r"shift\s*:?\s*(\d)", line, re.IGNORECASE)
+        if m:
+            data["shift"] = m.group(1)
+
+        # KODE RUTE
+        m = re.search(r"kode\s*rute\s*:?\s*([A-Za-z0-9]+)", line, re.IGNORECASE)
+        if m:
+            data["koderute"] = m.group(1)
+
+        # NO BODY
+        m = re.search(r"no\s*body\s*:?\s*(.+)", line, re.IGNORECASE)
+        if m:
+            data["nobody"] = m.group(1).strip()
+
+        # TOB FP
+        m = re.search(r"tob\s*fp\s*:?\s*(\d+)", line, re.IGNORECASE)
+        if m:
+            data["tobfp"] = m.group(1)
+
+        # TOB EP
+        m = re.search(r"tob\s*ep\s*:?\s*(\d+)", line, re.IGNORECASE)
+        if m:
+            data["tobep"] = m.group(1)
+
+        # TOB LG
+        m = re.search(r"tob\s*lg\s*:?\s*(\d+)", line, re.IGNORECASE)
+        if m:
+            data["toblg"] = m.group(1)
+
+        # TAP OUT
+        m = re.search(r"tap\s*out\s*:?\s*(\d+)", line, re.IGNORECASE)
+        if m:
+            data["tapout"] = m.group(1)
 
     return data
 
@@ -100,9 +130,8 @@ def isi_template(template_path, chat_text, tanggal_target, output_file):
     ws["A1"] = f"HARI/TANGGAL : {hari_id[tanggal.strftime('%A')]} {tanggal.strftime('%d %B %Y')}"
 
     for rep in reports:
-
         if not rep.strip():
-            continue   # skip laporan kosong
+            continue
 
         data = parse_report(rep)
 
@@ -121,26 +150,24 @@ def isi_template(template_path, chat_text, tanggal_target, output_file):
             continue
 
         best_match = process.extractOne(kode_rute_input, mapping.keys())
-
         if not best_match:
             continue
 
         best_match, score, _ = best_match
-
         if score < 80:
             continue
 
         rows = mapping[best_match]
         target_row = None
 
-        # cari baris no body yang sama (shift 2)
+        # cari baris dengan no body sama (shift 2)
         for r in rows:
             cell_value = ws[f"C{r}"].value
             if clean_text(cell_value) == no_body_clean:
                 target_row = r
                 break
 
-        # cari baris kosong (shift 1)
+        # jika belum ada, cari baris kosong (shift 1)
         if not target_row:
             for r in rows:
                 if ws[f"C{r}"].value in (None, ""):
