@@ -11,7 +11,7 @@ from datetime import datetime
 # =========================
 st.set_page_config(
     page_title="Laporan Rusun",
-    page_icon="icon.png",
+    page_icon="building.png",
     layout="centered"
 )
 
@@ -84,7 +84,8 @@ set_background("rusun oke.jpg")
 # =========================
 st.markdown("""
 <div class="header-box">
-    <h1>📊 Web App Laporan TOB Rute Integrasi Rusun</h1>
+    <img src="icon.png">
+    <h1>Web App Laporan TOB Rute Integrasi Rusun</h1>
     <p>Upload chat WhatsApp & generate Excel otomatis</p>
 </div>
 """, unsafe_allow_html=True)
@@ -154,4 +155,5 @@ if uploaded_file and tanggal_target:
 # =========================
 st.markdown("---")
 st.caption("Developed for Laporan Rusun • 2026")
+
 
