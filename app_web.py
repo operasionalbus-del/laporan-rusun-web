@@ -2,72 +2,121 @@ import streamlit as st
 from app_logic import isi_template
 import tempfile
 import base64
+import os
+from datetime import datetime
 
-st.set_page_config(page_title="Laporan Rusun", layout="centered")
 
 # =========================
-# Background image function
+# SET PAGE
 # =========================
-def set_bg(image_file):
+st.set_page_config(
+    page_title="Laporan Rusun",
+    page_icon="📊",
+    layout="centered"
+)
+
+
+# =========================
+# BACKGROUND IMAGE
+# =========================
+def set_background(image_file):
+    if not os.path.exists(image_file):
+        st.warning("Background image tidak ditemukan.")
+        return
+
     with open(image_file, "rb") as f:
-        data = f.read()
-    encoded = base64.b64encode(data).decode()
+        encoded = base64.b64encode(f.read()).decode()
 
-    st.markdown(
-        f"""
-        <style>
-        .stApp {{
-            background-image: url("data:image/jpg;base64,{encoded}");
-            background-size: cover;
-            background-position: center;
-            background-repeat: no-repeat;
-        }}
+    css = f"""
+    <style>
+    .stApp {{
+        background-image: url("data:image/jpg;base64,{encoded}");
+        background-size: cover;
+        background-position: center;
+        background-attachment: fixed;
+    }}
 
-        /* Container putih transparan */
-        .block-container {{
-            background: rgba(255, 255, 255, 0.88);
-            padding: 2rem;
-            border-radius: 15px;
-        }}
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
+    .main {{
+        background-color: rgba(255,255,255,0.88);
+        padding: 2rem;
+        border-radius: 15px;
+    }}
+    </style>
+    """
+    st.markdown(css, unsafe_allow_html=True)
 
-# pakai background rusunawa.jpg
-set_bg("rusun oke.jpg")
+
+set_background("rusun oke.jpg")
+
 
 # =========================
-# UI
+# HEADER
 # =========================
 st.title("📊 Web App Laporan TOB Rute Integrasi Rusun")
-st.write("Upload Chat WhatsApp & Generate Excel Otomatis")
+st.write("Upload chat WhatsApp & generate Excel otomatis")
 
-tanggal_target = st.text_input("Masukkan tanggal (dd/mm/yy)", "12/02/26")
 
-uploaded_file = st.file_uploader("Upload file chat WhatsApp (.txt)", type=["txt"])
+# =========================
+# INPUT
+# =========================
+tanggal_target = st.text_input("📅 Masukkan tanggal (dd/mm/yy)", "15/02/26")
 
+uploaded_file = st.file_uploader(
+    "📄 Upload file chat WhatsApp (.txt)",
+    type=["txt"]
+)
+
+
+# =========================
+# VALIDASI FORMAT TANGGAL
+# =========================
+def validasi_tanggal(tgl):
+    try:
+        datetime.strptime(tgl, "%d/%m/%y")
+        return True
+    except:
+        return False
+
+
+# =========================
+# PROCESS
+# =========================
 if uploaded_file and tanggal_target:
+
+    if not validasi_tanggal(tanggal_target):
+        st.error("❌ Format tanggal harus dd/mm/yy (contoh: 15/02/26)")
+        st.stop()
+
     chat_text = uploaded_file.read().decode("utf-8")
 
     if st.button("🚀 Generate Excel"):
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp:
-            output_file = tmp.name
 
-        template_path = "template_bersih.xlsx"
+        with st.spinner("⏳ Memproses laporan..."):
+            try:
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp:
+                    output_file = tmp.name
 
-        isi_template(template_path, chat_text, tanggal_target, output_file)
+                template_path = "template_bersih.xlsx"
 
-        with open(output_file, "rb") as f:
-            st.download_button(
-                label="📥 Download laporan Excel",
-                data=f,
-                file_name="laporan_otomatis.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
+                isi_template(template_path, chat_text, tanggal_target, output_file)
 
-        st.success("✅ File berhasil dibuat!")
+                with open(output_file, "rb") as f:
+                    st.download_button(
+                        label="📥 Download laporan Excel",
+                        data=f,
+                        file_name=f"laporan_{tanggal_target.replace('/','-')}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    )
+
+                st.success("✅ File berhasil dibuat!")
+
+            except Exception as e:
+                st.error("❌ Terjadi error saat memproses file")
+                st.exception(e)
 
 
-
-
+# =========================
+# FOOTER
+# =========================
+st.markdown("---")
+st.caption("Developed for Laporan Rusun • 2026")
