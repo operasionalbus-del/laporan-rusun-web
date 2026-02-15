@@ -41,7 +41,7 @@ set_bg("rusun oke.jpg")
 # UI
 # =========================
 st.title("📊 Web App Laporan TOB Rute Integrasi Rusun")
-st.write("Upload chat WhatsApp & generate Excel otomatis")
+st.write("Upload Chat WhatsApp & Generate Excel Otomatis")
 
 tanggal_target = st.text_input("Masukkan tanggal (dd/mm/yy)", "12/02/26")
 
@@ -67,6 +67,7 @@ if uploaded_file and tanggal_target:
             )
 
         st.success("✅ File berhasil dibuat!")
+
 
 
 
