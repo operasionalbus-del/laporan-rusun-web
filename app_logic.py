@@ -5,7 +5,7 @@ from openpyxl.cell.cell import MergedCell
 from rapidfuzz import process
 from mapping import mapping
 
-print("APP_LOGIC VERSION 2026-02-15 FINAL MERGED SAFE")
+print("APP_LOGIC VERSION 2026-02-16 DATE FILTER + MERGED SAFE")
 
 # =========================
 # Helper normalization
@@ -34,19 +34,33 @@ def safe_clear_cell(ws, cell):
 
 
 # =========================
-# STEP 1: Filter laporan
+# STEP 1: Filter chat by DATE
 # =========================
-def filter_orderan_from_text(text):
+def filter_orderan_from_text(text, tanggal_target):
     lines = text.splitlines()
     reports = []
     buffer = []
+    capture = False
 
     for line in lines:
+        # contoh: 15/02/26, 08:20 - Nama: Shift 1
+        if re.match(rf"^{tanggal_target},", line):
+            capture = True
+
+        # jika ketemu tanggal lain → stop capture
+        elif re.match(r"\d{2}/\d{2}/\d{2},", line):
+            capture = False
+
+        if not capture:
+            continue
+
+        # ambil pesan setelah "Nama:"
         if " - " in line and ":" in line:
             msg = line.split(":", 1)[1].strip()
         else:
             msg = line.strip()
 
+        # deteksi shift baru
         if re.match(r"^shift", msg.lower()):
             if buffer:
                 reports.append("\n".join(buffer))
@@ -58,6 +72,7 @@ def filter_orderan_from_text(text):
     if buffer:
         reports.append("\n".join(buffer))
 
+    print("TOTAL REPORT FOUND:", len(reports))
     return reports
 
 
@@ -76,7 +91,7 @@ def parse_report(text):
             val = val.strip()
             data[key] = val
         else:
-            # handle format "Shift 2"
+            # handle "Shift 2"
             m = re.match(r"(shift)\s*(\d)", line.lower())
             if m:
                 data["shift"] = m.group(2)
@@ -88,13 +103,13 @@ def parse_report(text):
 # STEP 3: Isi template
 # =========================
 def isi_template(template_path, chat_text, tanggal_target, output_file):
-    reports = filter_orderan_from_text(chat_text)
+    reports = filter_orderan_from_text(chat_text, tanggal_target)
 
     wb = load_workbook(template_path)
     ws = wb.active
 
     # =========================
-    # CLEAR TEMPLATE FIRST (SAFE)
+    # CLEAR TEMPLATE FIRST
     # =========================
     for row in range(1, ws.max_row + 1):
         for col in ["C", "D", "E", "F", "L", "M", "N", "O"]:
@@ -147,14 +162,14 @@ def isi_template(template_path, chat_text, tanggal_target, output_file):
         rows = mapping[best_match]
         target_row = None
 
-        # Cari body yang sama
+        # cari body yang sama
         for r in rows:
             cell_val = ws[f"C{r}"].value
             if normalize_text(cell_val) == no_body_clean:
                 target_row = r
                 break
 
-        # Cari slot kosong
+        # cari slot kosong
         if not target_row:
             for r in rows:
                 if ws[f"C{r}"].value in (None, ""):
