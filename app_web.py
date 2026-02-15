@@ -17,7 +17,7 @@ st.set_page_config(
 
 
 # =========================
-# BACKGROUND IMAGE
+# BACKGROUND IMAGE + CSS
 # =========================
 def set_background(image_file):
     if not os.path.exists(image_file):
@@ -36,22 +36,33 @@ def set_background(image_file):
         background-attachment: fixed;
     }}
 
-    /* HEADER CONTAINER */
+    /* HEADER BOX */
     .header-box {{
-        background-color: rgba(200, 200, 200, 0.9);
+        background-color: rgba(200,200,200,0.9);
         padding: 20px;
         border-radius: 15px;
         text-align: center;
         margin-bottom: 20px;
-        box-shadow: 0px 2px 6px rgba(0,0,0,0.2);
     }}
 
-    /* MAIN CONTENT */
+    /* MAIN CONTENT BOX */
     .main-box {{
-        background-color: rgba(255,255,255,0.9);
+        background-color: rgba(230,230,230,0.95);
         padding: 25px;
         border-radius: 15px;
-        box-shadow: 0px 2px 6px rgba(0,0,0,0.2);
+    }}
+
+    /* INPUT & UPLOADER BACKGROUND */
+    div[data-baseweb="input"] > div,
+    div[data-baseweb="file-uploader"] {{
+        background-color: rgba(255,255,255,0.95);
+        border-radius: 10px;
+        padding: 5px;
+    }}
+
+    label {{
+        font-weight: bold;
+        color: black;
     }}
     </style>
     """
@@ -62,7 +73,7 @@ set_background("rusun oke.jpg")
 
 
 # =========================
-# HEADER (WITH CONTAINER)
+# HEADER
 # =========================
 st.markdown("""
 <div class="header-box">
@@ -137,10 +148,11 @@ if uploaded_file and tanggal_target:
                 st.exception(e)
 
 
+st.markdown('</div>', unsafe_allow_html=True)
+
+
 # =========================
 # FOOTER
 # =========================
 st.markdown("---")
 st.caption("Developed for Laporan Rusun • 2026")
-
-st.markdown('</div>', unsafe_allow_html=True)
