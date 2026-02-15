@@ -88,7 +88,20 @@ set_background("rusun oke.jpg")
 # =========================
 logo_base64 = get_base64_image("tap.png")
 
-st.markdown("""
+st.markdown(f"""
+<style>
+.header-box {{
+    background-color: rgba(200,200,200,0.85);
+    padding: 2rem;
+    border-radius: 20px;
+    text-align: center;
+}}
+.header-box img {{
+    width: 80px;
+    margin-bottom: 10px;
+}}
+</style>
+
 <div class="header-box">
     <img src="tap.png">
     <h1>Web App Laporan TOB Rute Integrasi Rusun</h1>
@@ -161,6 +174,7 @@ if uploaded_file and tanggal_target:
 # =========================
 st.markdown("---")
 st.caption("Developed for Laporan Rusun • 2026")
+
 
 
 
