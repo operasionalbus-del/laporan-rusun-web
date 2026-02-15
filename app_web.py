@@ -11,7 +11,7 @@ from datetime import datetime
 # =========================
 st.set_page_config(
     page_title="Laporan Rusun",
-    page_icon="📊",
+    page_icon="icon.png",
     layout="centered"
 )
 
@@ -154,3 +154,4 @@ if uploaded_file and tanggal_target:
 # =========================
 st.markdown("---")
 st.caption("Developed for Laporan Rusun • 2026")
+
