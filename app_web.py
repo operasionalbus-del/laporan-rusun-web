@@ -86,7 +86,7 @@ set_background("rusun oke.jpg")
 # =========================
 # HEADER
 # =========================
-logo_base64 = get_base64_image("logo.png")
+logo_base64 = get_base64_image("tap.png")
 
 st.markdown("""
 <div class="header-box">
@@ -161,6 +161,7 @@ if uploaded_file and tanggal_target:
 # =========================
 st.markdown("---")
 st.caption("Developed for Laporan Rusun • 2026")
+
 
 
 
