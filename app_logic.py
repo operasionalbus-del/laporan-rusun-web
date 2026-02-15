@@ -123,7 +123,8 @@ def isi_template(template_path, chat_text, tanggal_target, output_file):
     ws = wb.active
 
     # CLEAR TEMPLATE
-    for row in range(1, ws.max_row + 1):
+    DATA_START_ROW = 6
+    for row in range(DATA_START_ROW, ws.max_row + 1):
         for col in ["C", "D", "E", "F", "L", "M", "N", "O"]:
             safe_clear_cell(ws, f"{col}{row}")
 
@@ -200,3 +201,4 @@ def isi_template(template_path, chat_text, tanggal_target, output_file):
     wb.save(output_file)
     print("FILE SAVED:", output_file)
     return output_file
+
