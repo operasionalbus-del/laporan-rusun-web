@@ -35,7 +35,7 @@ def set_bg(image_file):
     )
 
 # pakai background rusunawa.jpg
-set_bg("rusunawa.jpg")
+set_bg("rusunawa jt.jpeg")
 
 # =========================
 # UI
@@ -67,3 +67,4 @@ if uploaded_file and tanggal_target:
             )
 
         st.success("✅ File berhasil dibuat!")
+
