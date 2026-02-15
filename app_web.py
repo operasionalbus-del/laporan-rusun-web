@@ -36,39 +36,46 @@ def set_background(image_file):
         background-attachment: fixed;
     }}
 
-    /* HEADER BOX */
+    /* HEADER CONTAINER */
     .header-box {{
         background-color: rgba(200,200,200,0.9);
-        padding: 20px;
-        border-radius: 15px;
-        text-align: center;
-        margin-bottom: 20px;
-    }}
-
-    /* MAIN CONTENT BOX */
-    .main-box {{
-        background-color: rgba(230,230,230,0.95);
         padding: 25px;
-        border-radius: 15px;
+        border-radius: 18px;
+        text-align: center;
+        margin-bottom: 25px;
     }}
 
-    /* INPUT & UPLOADER BACKGROUND */
+    /* LABEL BACKGROUND */
+    label {{
+        background-color: rgba(200,200,200,0.9);
+        padding: 6px 12px;
+        border-radius: 8px;
+        display: inline-block;
+        margin-bottom: 6px;
+        color: black;
+        font-weight: bold;
+    }}
+
+    /* INPUT BOX BACKGROUND */
     div[data-baseweb="input"] > div,
     div[data-baseweb="file-uploader"] {{
-        background-color: rgba(255,255,255,0.95);
-        border-radius: 10px;
-        padding: 5px;
+        background-color: rgba(240,240,240,0.95);
+        border-radius: 12px;
+        padding: 6px;
     }}
 
-    label {{
-        font-weight: bold;
-        color: black;
+    /* MAIN CONTAINER */
+    .main {{
+        background-color: rgba(255,255,255,0.85);
+        padding: 2rem;
+        border-radius: 18px;
     }}
     </style>
     """
     st.markdown(css, unsafe_allow_html=True)
 
 
+# pakai background
 set_background("rusun oke.jpg")
 
 
@@ -81,12 +88,6 @@ st.markdown("""
     <p>Upload chat WhatsApp & generate Excel otomatis</p>
 </div>
 """, unsafe_allow_html=True)
-
-
-# =========================
-# MAIN CONTAINER
-# =========================
-st.markdown('<div class="main-box">', unsafe_allow_html=True)
 
 
 # =========================
@@ -146,9 +147,6 @@ if uploaded_file and tanggal_target:
             except Exception as e:
                 st.error("❌ Terjadi error saat memproses file")
                 st.exception(e)
-
-
-st.markdown('</div>', unsafe_allow_html=True)
 
 
 # =========================
