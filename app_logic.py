@@ -99,6 +99,7 @@ def parse_report(text):
             key, val = line.split(":", 1)
             key = normalize_key(key)
             val = val.strip()
+            val = val.replace("<Pesan ini diedit>", "").strip()
             data[key] = val
 
             #tambahan khusus shift
@@ -222,5 +223,6 @@ def isi_template(template_path, chat_text, tanggal_target, output_file):
     wb.save(output_file)
     print("FILE SAVED:", output_file)
     return output_file
+
 
 
