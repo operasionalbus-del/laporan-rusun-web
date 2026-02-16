@@ -4,7 +4,7 @@ from openpyxl import load_workbook
 from openpyxl.cell.cell import MergedCell
 from mapping import mapping
 
-print("APP_LOGIC VERSION 2026-02-16 BODY_ROW_MAP FIX")
+print("APP_LOGIC VERSION 2026-02-16 STABLE ENGINE")
 
 # =========================
 # Helper
@@ -41,7 +41,6 @@ def filter_orderan_from_text(text, tanggal_target):
 
     for line in lines:
         line = line.strip()
-
         m = date_pattern.match(line)
 
         if m:
@@ -68,13 +67,14 @@ def filter_orderan_from_text(text, tanggal_target):
         if "pesan ini dihapus" in msg.lower():
             continue
 
+        # DETEKSI AWAL REPORT (fleksibel)
         if re.search(r"\bshift\b", msg.lower()):
             if buffer:
                 reports.append("\n".join(buffer))
                 buffer = []
             buffer.append(msg)
             continue
-            
+
         if msg:
             buffer.append(msg)
 
@@ -86,37 +86,33 @@ def filter_orderan_from_text(text, tanggal_target):
 
 
 # =========================
-# STEP 2: Parsing laporan
+# STEP 2: Parsing laporan (FIX SHIFT TOTAL)
 # =========================
 def parse_report(text):
     data = {}
 
     for line in text.splitlines():
         line = line.strip()
+        line = line.replace("<Pesan ini diedit>", "").strip()
 
         if ":" in line:
             key, val = line.split(":", 1)
             key = normalize_key(key)
             val = val.strip()
-            val = val.replace("<Pesan ini diedit>", "").strip()
+
             data[key] = val
 
-            #tambahan khusus shift
-            if key == "shift": 
-                num = re.search(r"\d+", val) 
-                if num: 
+            # Tangkap semua variasi shift (shift / kmjshift / dll)
+            if "shift" in key:
+                num = re.search(r"\d+", val)
+                if num:
                     data["shift"] = num.group(0)
-        
-        else:
-            m = re.match(r"(shift)\s*:?(\s*\d)", line.lower())
-            if m:
-                data["shift"] = m.group(2).strip()
 
     return data
 
 
 # =========================
-# STEP 3: Isi template (FIXED)
+# STEP 3: Isi template (STABLE VERSION)
 # =========================
 def isi_template(template_path, chat_text, tanggal_target, output_file):
     reports = filter_orderan_from_text(chat_text, tanggal_target)
@@ -126,7 +122,7 @@ def isi_template(template_path, chat_text, tanggal_target, output_file):
 
     DATA_START_ROW = 6
 
-    # CLEAR DATA (tanpa rusak merged cell)
+    # CLEAR DATA
     for row in range(DATA_START_ROW, ws.max_row + 1):
         for col in ["C", "D", "E", "F", "L", "M", "N", "O"]:
             safe_clear_cell(ws, f"{col}{row}")
@@ -148,16 +144,15 @@ def isi_template(template_path, chat_text, tanggal_target, output_file):
     ws["A1"] = f"HARI/TANGGAL : {hari_id[tanggal.strftime('%A')]} {tanggal.strftime('%d %B %Y')}"
 
     # =========================
-    # BODY ROW MAP (KUNCI FIX)
+    # ENGINE ROW ALLOCATION (DETERMINISTIC)
     # =========================
     body_row_map = {}
 
-    # Proses laporan
     for rep in reports:
         data = parse_report(rep)
 
         shift = data.get("shift", "").strip()
-        kode_rute_input = normalize_text(data.get("koderute", ""))
+        kode_rute = normalize_text(data.get("koderute", ""))
 
         no_body_raw = data.get("nobody", "")
         no_body_clean = normalize_text(no_body_raw)
@@ -167,51 +162,42 @@ def isi_template(template_path, chat_text, tanggal_target, output_file):
         tob_lg = safe_int(data.get("toblg"))
         tap_out = safe_int(data.get("tapout"))
 
-        if not kode_rute_input or not no_body_clean:
+        if not kode_rute or not no_body_clean:
             continue
 
-        if kode_rute_input not in mapping:
-            print("ROUTE NOT FOUND:", kode_rute_input)
+        if kode_rute not in mapping:
+            print("ROUTE NOT FOUND:", kode_rute)
             continue
 
-        rows = mapping[kode_rute_input]
-        best_match = kode_rute_input
+        rows = mapping[kode_rute]
+        key = (kode_rute, no_body_clean)
 
-        key = (best_match, no_body_clean)
-        target_row = None
+        # Tentukan row
+        if key not in body_row_map:
+            used_rows = set(body_row_map.values())
+            target_row = None
 
-        # Jika sudah pernah dicatat
-        if key in body_row_map:
-            target_row = body_row_map[key]
-        else:
-            # cari di excel
             for r in rows:
-                if normalize_text(ws[f"C{r}"].value) == no_body_clean:
+                if r not in used_rows:
                     target_row = r
                     break
 
-            # cari slot kosong
             if not target_row:
-                for r in rows:
-                    if ws[f"C{r}"].value in (None, ""):
-                        target_row = r
-                        break
-
-            if not target_row:
-                print("NO SLOT:", best_match, no_body_clean)
+                print("NO SLOT:", kode_rute, no_body_clean)
                 continue
 
             body_row_map[key] = target_row
 
+        target_row = body_row_map[key]
+
         # =========================
         # TULIS DATA
         # =========================
-        
-        # Pastikan body selalu ditulis
+
+        # BODY SELALU DITULIS
         ws[f"C{target_row}"] = no_body_raw.upper()
-        
+
         if shift == "1":
-            ws[f"C{target_row}"] = no_body_raw.upper()
             ws[f"D{target_row}"] = tob_fp
             ws[f"E{target_row}"] = tob_ep
             ws[f"F{target_row}"] = tob_lg
@@ -222,13 +208,9 @@ def isi_template(template_path, chat_text, tanggal_target, output_file):
             ws[f"N{target_row}"] = tob_ep
             ws[f"O{target_row}"] = tob_lg
 
+        else:
+            print("SHIFT TIDAK TERBACA:", no_body_raw)
+
     wb.save(output_file)
     print("FILE SAVED:", output_file)
     return output_file
-
-
-
-
-
-
-
