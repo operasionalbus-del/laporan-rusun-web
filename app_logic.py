@@ -171,13 +171,12 @@ def isi_template(template_path, chat_text, tanggal_target, output_file):
         if not kode_rute_input or not no_body_clean:
             continue
 
-        best_match, score, _ = process.extractOne(kode_rute_input, mapping.keys())
-
-        if score < 70:
-            print("SKIP ROUTE:", kode_rute_input)
+        if kode_rute_input not in mapping:
+            print("ROUTE NOT FOUND:", kode_rute_input)
             continue
 
-        rows = mapping[best_match]
+        rows = mapping[kode_rute_input]
+        best_match = kode_rute_input
 
         key = (best_match, no_body_clean)
         target_row = None
@@ -223,6 +222,7 @@ def isi_template(template_path, chat_text, tanggal_target, output_file):
     wb.save(output_file)
     print("FILE SAVED:", output_file)
     return output_file
+
 
 
 
