@@ -98,6 +98,13 @@ def parse_report(text):
             key = normalize_key(key)
             val = val.strip()
             data[key] = val
+
+            #tambahan khusus shift
+            if key == "shift": 
+                num = re.search(r"\d+", val) 
+                if num: 
+                    data["shift"] = num.group(0)
+        
         else:
             m = re.match(r"(shift)\s*:?(\s*\d)", line.lower())
             if m:
@@ -213,3 +220,4 @@ def isi_template(template_path, chat_text, tanggal_target, output_file):
     wb.save(output_file)
     print("FILE SAVED:", output_file)
     return output_file
+
