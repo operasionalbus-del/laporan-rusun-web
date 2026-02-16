@@ -206,6 +206,10 @@ def isi_template(template_path, chat_text, tanggal_target, output_file):
         # =========================
         # TULIS DATA
         # =========================
+        
+        # Pastikan body selalu ditulis
+        ws[f"C{target_row}"] = no_body_raw.upper()
+        
         if shift == "1":
             ws[f"C{target_row}"] = no_body_raw.upper()
             ws[f"D{target_row}"] = tob_fp
@@ -221,6 +225,7 @@ def isi_template(template_path, chat_text, tanggal_target, output_file):
     wb.save(output_file)
     print("FILE SAVED:", output_file)
     return output_file
+
 
 
 
