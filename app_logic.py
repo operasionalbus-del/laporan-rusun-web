@@ -95,20 +95,19 @@ def parse_report(text):
         line = line.strip()
         line = line.replace("<Pesan ini diedit>", "").strip()
 
+        # Deteksi shift langsung (paling aman)
+        m_shift = re.search(r"\bshift\s*:?\s*(\d)", line.lower())
+        if m_shift:
+            data["shift"] = m_shift.group(1)
+
         if ":" in line:
             key, val = line.split(":", 1)
             key = normalize_key(key)
             val = val.strip()
-
             data[key] = val
 
-            # Tangkap semua variasi shift (shift / kmjshift / dll)
-            if "shift" in key:
-                num = re.search(r"\d+", val)
-                if num:
-                    data["shift"] = num.group(0)
-
     return data
+
 
 
 # =========================
@@ -214,3 +213,4 @@ def isi_template(template_path, chat_text, tanggal_target, output_file):
     wb.save(output_file)
     print("FILE SAVED:", output_file)
     return output_file
+
