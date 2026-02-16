@@ -68,7 +68,7 @@ def filter_orderan_from_text(text, tanggal_target):
         if "pesan ini dihapus" in msg.lower():
             continue
 
-        if re.match(r"^shift", msg.lower()):
+        if re.search(r"\bshift\b", msg.lower()):
             if buffer:
                 reports.append("\n".join(buffer))
                 buffer = []
@@ -221,6 +221,7 @@ def isi_template(template_path, chat_text, tanggal_target, output_file):
     wb.save(output_file)
     print("FILE SAVED:", output_file)
     return output_file
+
 
 
 
