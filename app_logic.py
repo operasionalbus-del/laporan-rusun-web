@@ -2,7 +2,6 @@ import datetime
 import re
 from openpyxl import load_workbook
 from openpyxl.cell.cell import MergedCell
-from rapidfuzz import process
 from mapping import mapping
 
 print("APP_LOGIC VERSION 2026-02-16 BODY_ROW_MAP FIX")
@@ -222,6 +221,7 @@ def isi_template(template_path, chat_text, tanggal_target, output_file):
     wb.save(output_file)
     print("FILE SAVED:", output_file)
     return output_file
+
 
 
 
