@@ -245,6 +245,6 @@ if uploaded_file and tanggal_target:
 # =========================
 st.markdown("""
 <div class="footer-box">
-    Developed for Laporan Rusun • 2026
+    Developed for Laporan Jumlah Pelanggan Rute Integrasi Rusun • 2026
 </div>
 """, unsafe_allow_html=True)
