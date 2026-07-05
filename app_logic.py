@@ -307,9 +307,6 @@ def isi_template(template_path, chat_text, tanggal_target, output_file):
     ws[f"A{start+5}"] = status
     ws[f"A{start+5}"].font = Font(bold=True)
     
-    ws["A72"] = "CHATGPT TEST"
-
-    print("ISI A72 =", ws["A72"].value)
     
     wb.save(output_file)
     print("FILE SAVED:", output_file)
