@@ -74,6 +74,45 @@ def set_background(image_file):
         padding: 2rem;
         border-radius: 18px;
     }}
+
+    /* =========================
+   BUTTON GENERATE
+========================= */
+
+.stButton > button {
+    width: 100%;
+    background-color: #0E7490;
+    color: white;
+    border-radius: 12px;
+    border: none;
+    font-weight: bold;
+    padding: 12px;
+    transition: 0.3s;
+}
+
+.stButton > button:hover {
+    background-color: #155E75;
+}
+
+
+/* =========================
+   BUTTON DOWNLOAD
+========================= */
+
+.stDownloadButton > button {
+    width: 100%;
+    background-color: #16A34A;
+    color: white;
+    border-radius: 12px;
+    border: none;
+    font-weight: bold;
+    padding: 12px;
+    transition: 0.3s;
+}
+
+.stDownloadButton > button:hover {
+    background-color: #15803D;
+}
     </style>
     """
     st.markdown(css, unsafe_allow_html=True)
@@ -164,7 +203,10 @@ if uploaded_file and tanggal_target:
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                     )
 
-                st.success("✅ File berhasil dibuat!")
+                st.success(
+                "✅ Rekap berhasil diproses.\n\n"
+                "Silakan klik tombol **Download Laporan Excel** di bawah untuk mengunduh hasil."
+                )
 
             except Exception as e:
                 st.error("❌ Terjadi error saat memproses file")
@@ -174,7 +216,19 @@ if uploaded_file and tanggal_target:
 # =========================
 # FOOTER
 # =========================
-st.markdown("---")
+st.markdown("""
+<div style="
+    margin-top:40px;
+    padding:12px;
+    background:rgba(255,255,255,0.90);
+    border-radius:10px;
+    text-align:center;
+    font-weight:bold;
+    color:#222;
+">
+Developed for Laporan Rusun • 2026
+</div>
+""", unsafe_allow_html=True)
 st.caption("Developed for Laporan Rusun • 2026")
 
 
