@@ -4,7 +4,7 @@ from openpyxl import load_workbook
 from openpyxl.cell.cell import MergedCell
 from mapping import mapping
 
-print("APP_LOGIC VERSION 2026-02-16 STABLE ENGINE")
+print("APP_LOGIC VERSION 2026-07-05 ANALISIS V1")
 
 # =========================
 # Helper
@@ -307,6 +307,9 @@ def isi_template(template_path, chat_text, tanggal_target, output_file):
     ws[f"A{start+5}"] = status
     ws[f"A{start+5}"].font = Font(bold=True)
     
+ws["A72"] = "CHATGPT TEST"
+
+print("ISI A72 =", ws["A72"].value)
     
     wb.save(output_file)
     print("FILE SAVED:", output_file)
