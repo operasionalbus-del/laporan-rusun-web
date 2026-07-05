@@ -99,10 +99,10 @@ def analisis_rekap(ws):
             if ws[f"M{row}"].value is None or ws[f"N{row}"].value is None or ws[f"O{row}"].value is None:
                 anomali += 1
 
-    status = "🟢 TKA, SIAP KIRIM"
+    status = "[OK] TKA, SIAP KIRIM"
 
     if anomali > 0 or duplicate:
-        status = "🔴 PERLU VERIFIKASI SEBELUM DIKIRIM"
+        status = "[WARNING] PERLU VERIFIKASI SEBELUM DIKIRIM"
 
     return anomali, duplicate, status
 
