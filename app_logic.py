@@ -27,6 +27,84 @@ def safe_clear_cell(ws, cell):
     if not isinstance(ws[cell], MergedCell):
         ws[cell] = None
 
+from openpyxl.styles import Font
+
+def analisis_rekap(ws):
+    START_ROW = 6
+    END_ROW = 69
+
+    anomali = 0
+    duplicate = False
+
+    body_list = []
+
+    for row in range(START_ROW, END_ROW + 1):
+
+        body = ws[f"C{row}"].value
+
+        if not body:
+            continue
+
+        body = str(body).strip().upper()
+
+        if body in body_list:
+            duplicate = True
+        else:
+            body_list.append(body)
+
+        # ==========================
+        # SHIFT 1
+        # ==========================
+        fp1 = ws[f"D{row}"].value
+        ep1 = ws[f"E{row}"].value
+        lg1 = ws[f"F{row}"].value
+
+        if fp1 is not None or ep1 is not None or lg1 is not None:
+
+            fp1 = fp1 or 0
+            ep1 = ep1 or 0
+            lg1 = lg1 or 0
+
+            # Rule 1
+            if fp1 == 0 and ep1 == 0 and lg1 == 0:
+                anomali += 1
+
+            # Rule 2
+            if fp1 > 500 or ep1 > 500 or lg1 > 500:
+                anomali += 1
+
+            # Rule 3
+            if ws[f"D{row}"].value is None or ws[f"E{row}"].value is None or ws[f"F{row}"].value is None:
+                anomali += 1
+
+        # ==========================
+        # SHIFT 2
+        # ==========================
+        fp2 = ws[f"M{row}"].value
+        ep2 = ws[f"N{row}"].value
+        lg2 = ws[f"O{row}"].value
+
+        if fp2 is not None or ep2 is not None or lg2 is not None:
+
+            fp2 = fp2 or 0
+            ep2 = ep2 or 0
+            lg2 = lg2 or 0
+
+            if fp2 == 0 and ep2 == 0 and lg2 == 0:
+                anomali += 1
+
+            if fp2 > 500 or ep2 > 500 or lg2 > 500:
+                anomali += 1
+
+            if ws[f"M{row}"].value is None or ws[f"N{row}"].value is None or ws[f"O{row}"].value is None:
+                anomali += 1
+
+    status = "🟢 TKA, SIAP KIRIM"
+
+    if anomali > 0 or duplicate:
+        status = "🔴 PERLU VERIFIKASI SEBELUM DIKIRIM"
+
+    return anomali, duplicate, status
 
 # =========================
 # STEP 1: Filter chat by DATE
@@ -210,6 +288,26 @@ def isi_template(template_path, chat_text, tanggal_target, output_file):
         else:
             print("SHIFT TIDAK TERBACA:", no_body_raw)
 
+    # ==========================
+    # ANALISIS REKAP
+    # ==========================
+
+    anomali, duplicate, status = analisis_rekap(ws)
+
+    start = 72
+
+    ws[f"A{start}"] = "HASIL ANALISIS REKAP"
+    ws[f"A{start}"].font = Font(bold=True)
+
+    ws[f"A{start+1}"] = f"{'🟡' if anomali else '🟢'} Anomali Pelanggan : {'Tidak Ada' if anomali == 0 else str(anomali) + ' Temuan'}"
+
+    ws[f"A{start+2}"] = f"{'🔴' if duplicate else '🟢'} Duplikasi Body : {'Ada' if duplicate else 'Tidak Ada'}"
+
+    ws[f"A{start+4}"] = "Status Rekap"
+    ws[f"A{start+5}"] = status
+    ws[f"A{start+5}"].font = Font(bold=True)
+    
+    
     wb.save(output_file)
     print("FILE SAVED:", output_file)
     return output_file
