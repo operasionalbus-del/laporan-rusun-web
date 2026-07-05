@@ -2,12 +2,11 @@ import datetime
 import re
 from openpyxl import load_workbook
 from openpyxl.cell.cell import MergedCell
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from mapping import mapping
 
-print("APP_LOGIC VERSION 2026-07-05 ANALISIS V1")
-
 # =========================
-# Helper
+# Helper umum
 # =========================
 def normalize_text(s):
     if not s:
@@ -27,84 +26,246 @@ def safe_clear_cell(ws, cell):
     if not isinstance(ws[cell], MergedCell):
         ws[cell] = None
 
-from openpyxl.styles import Font
 
+# =========================
+# Style untuk laporan analisis
+# =========================
+FILL_HEADER = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
+FONT_HEADER = Font(bold=True, color="FFFFFF")
+
+FILL_STATUS_OK = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")
+FONT_STATUS_OK = Font(bold=True, color="1E7B34")
+
+FILL_STATUS_WARNING = PatternFill(start_color="FCE4E4", end_color="FCE4E4", fill_type="solid")
+FONT_STATUS_WARNING = Font(bold=True, color="C00000")
+
+FILL_ROW_ANOMALI = PatternFill(start_color="FFF2CC", end_color="FFF2CC", fill_type="solid")
+FILL_ROW_DUPLIKAT = PatternFill(start_color="FCE4E4", end_color="FCE4E4", fill_type="solid")
+
+FONT_TITLE = Font(bold=True, size=13)
+FONT_SUBTITLE = Font(bold=True, size=11)
+
+THIN_SIDE = Side(style="thin", color="BFBFBF")
+BORDER_THIN = Border(left=THIN_SIDE, right=THIN_SIDE, top=THIN_SIDE, bottom=THIN_SIDE)
+
+ALIGN_CENTER = Alignment(horizontal="center", vertical="center", wrap_text=True)
+ALIGN_LEFT = Alignment(horizontal="left", vertical="center", wrap_text=True)
+
+RULE_LABEL = {
+    1: "Rule 1 - Data 0 Semua",
+    2: "Rule 2 - Nilai Ekstrem (>500)",
+    3: "Rule 3 - Data Tidak Lengkap",
+    4: "Rule 4 - Duplikasi No Body",
+}
+
+
+# =========================
+# ANALISIS REKAP
+# =========================
 def analisis_rekap(ws):
+    """
+    Menjalankan Rule 1-4 terhadap data rekap pada worksheet.
+
+    Return dict:
+        total_anomali : jumlah baris/shift yang punya minimal 1 temuan (Rule 1-3)
+        duplikat      : list No Body yang duplikat
+        detail        : list of dict {row, no_body, shift, rules, keterangan}
+        status        : teks status akhir
+    """
     START_ROW = 6
     END_ROW = 69
 
-    anomali = 0
-    duplicate = False
-
-    body_list = []
+    detail = []
+    body_seen = {}      # no_body -> row pertama kali muncul
+    duplikat_body = []
 
     for row in range(START_ROW, END_ROW + 1):
-
         body = ws[f"C{row}"].value
-
         if not body:
             continue
 
         body = str(body).strip().upper()
 
-        if body in body_list:
-            duplicate = True
+        # ---- Rule 4: duplikasi No Body ----
+        if body in body_seen:
+            duplikat_body.append(body)
+            detail.append({
+                "row": row,
+                "no_body": body,
+                "shift": "-",
+                "rules": [4],
+                "keterangan": f"No Body sama dengan baris {body_seen[body]}",
+            })
         else:
-            body_list.append(body)
+            body_seen[body] = row
 
-        # ==========================
-        # SHIFT 1
-        # ==========================
-        fp1 = ws[f"D{row}"].value
-        ep1 = ws[f"E{row}"].value
-        lg1 = ws[f"F{row}"].value
+        # ---- Cek Shift 1 (kolom D, E, F) ----
+        _cek_shift(ws, row, body, "Shift 1", "D", "E", "F", detail)
 
-        if fp1 is not None or ep1 is not None or lg1 is not None:
+        # ---- Cek Shift 2 (kolom M, N, O) ----
+        _cek_shift(ws, row, body, "Shift 2", "M", "N", "O", detail)
 
-            fp1 = fp1 or 0
-            ep1 = ep1 or 0
-            lg1 = lg1 or 0
+    total_anomali = sum(1 for d in detail if d["rules"] != [4])
+    duplicate = len(duplikat_body) > 0
 
-            # Rule 1
-            if fp1 == 0 and ep1 == 0 and lg1 == 0:
-                anomali += 1
+    if total_anomali > 0 or duplicate:
+        status = "PERLU VERIFIKASI SEBELUM DIKIRIM"
+    else:
+        status = "TKA, SIAP KIRIM"
 
-            # Rule 2
-            if fp1 > 500 or ep1 > 500 or lg1 > 500:
-                anomali += 1
+    return {
+        "total_anomali": total_anomali,
+        "duplikat": duplikat_body,
+        "detail": detail,
+        "status": status,
+    }
 
-            # Rule 3
-            if ws[f"D{row}"].value is None or ws[f"E{row}"].value is None or ws[f"F{row}"].value is None:
-                anomali += 1
 
-        # ==========================
-        # SHIFT 2
-        # ==========================
-        fp2 = ws[f"M{row}"].value
-        ep2 = ws[f"N{row}"].value
-        lg2 = ws[f"O{row}"].value
+def _cek_shift(ws, row, body, shift_label, col_fp, col_ep, col_lg, detail):
+    """Cek Rule 1-3 untuk satu shift (dipakai untuk Shift 1 & Shift 2)."""
+    v_fp = ws[f"{col_fp}{row}"].value
+    v_ep = ws[f"{col_ep}{row}"].value
+    v_lg = ws[f"{col_lg}{row}"].value
 
-        if fp2 is not None or ep2 is not None or lg2 is not None:
+    # Kalau shift ini sama sekali tidak ada data (semua kosong),
+    # anggap shift tidak berjalan hari itu -> bukan anomali.
+    if v_fp is None and v_ep is None and v_lg is None:
+        return
 
-            fp2 = fp2 or 0
-            ep2 = ep2 or 0
-            lg2 = lg2 or 0
+    fp = v_fp or 0
+    ep = v_ep or 0
+    lg = v_lg or 0
 
-            if fp2 == 0 and ep2 == 0 and lg2 == 0:
-                anomali += 1
+    rules_triggered = []
+    catatan = []
 
-            if fp2 > 500 or ep2 > 500 or lg2 > 500:
-                anomali += 1
+    # Rule 1: FP = EP = LG = 0
+    if fp == 0 and ep == 0 and lg == 0:
+        rules_triggered.append(1)
+        catatan.append("Semua nilai (FP, EP, LG) = 0")
 
-            if ws[f"M{row}"].value is None or ws[f"N{row}"].value is None or ws[f"O{row}"].value is None:
-                anomali += 1
+    # Rule 2: salah satu nilai > 500
+    if fp > 500 or ep > 500 or lg > 500:
+        rules_triggered.append(2)
+        catatan.append("Ada nilai > 500 (FP/EP/LG)")
 
-    status = "[OK] TKA, SIAP KIRIM"
+    # Rule 3: ada kolom yang kosong (data tidak lengkap)
+    if v_fp is None or v_ep is None or v_lg is None:
+        rules_triggered.append(3)
+        catatan.append("Ada kolom FP/EP/LG yang kosong")
 
-    if anomali > 0 or duplicate:
-        status = "[WARNING] PERLU VERIFIKASI SEBELUM DIKIRIM"
+    if rules_triggered:
+        detail.append({
+            "row": row,
+            "no_body": body,
+            "shift": shift_label,
+            "rules": rules_triggered,
+            "keterangan": "; ".join(catatan),
+        })
 
-    return anomali, duplicate, status
+
+# =========================
+# Tulis laporan analisis ke Excel (rapi & enak dibaca)
+# =========================
+def tulis_laporan_analisis(ws, hasil, start_row=72):
+    row = start_row
+
+    # ---- Judul ----
+    ws.merge_cells(f"A{row}:Q{row}")
+    ws[f"A{row}"] = "HASIL ANALISIS REKAP"
+    ws[f"A{row}"].font = FONT_TITLE
+    ws[f"A{row}"].alignment = Alignment(horizontal="left", vertical="center")
+    ws.row_dimensions[row].height = 20
+    row += 2
+
+    # ---- Status akhir (banner) ----
+    is_ok = hasil["status"].startswith("TKA")
+    ws.merge_cells(f"A{row}:Q{row}")
+    status_cell = ws[f"A{row}"]
+    status_cell.value = f"{'✅' if is_ok else '⚠️'}  STATUS REKAP : {hasil['status']}"
+    status_cell.font = FONT_STATUS_OK if is_ok else FONT_STATUS_WARNING
+    status_cell.fill = FILL_STATUS_OK if is_ok else FILL_STATUS_WARNING
+    status_cell.alignment = Alignment(horizontal="left", vertical="center")
+    ws.row_dimensions[row].height = 22
+    row += 2
+
+    # ---- Ringkasan singkat ----
+    ws.merge_cells(f"A{row}:Q{row}")
+    ws[f"A{row}"] = (
+        f"{'🟢' if hasil['total_anomali'] == 0 else '🟡'} Anomali Pelanggan : "
+        f"{'Tidak Ada' if hasil['total_anomali'] == 0 else str(hasil['total_anomali']) + ' Temuan'}"
+    )
+    ws[f"A{row}"].font = FONT_SUBTITLE
+    row += 1
+
+    ws.merge_cells(f"A{row}:Q{row}")
+    ws[f"A{row}"] = (
+        f"{'🟢' if not hasil['duplikat'] else '🔴'} Duplikasi Body : "
+        f"{'Tidak Ada' if not hasil['duplikat'] else str(len(hasil['duplikat'])) + ' Ditemukan'}"
+    )
+    ws[f"A{row}"].font = FONT_SUBTITLE
+    row += 2
+
+    detail = hasil["detail"]
+
+    if not detail:
+        ws.merge_cells(f"A{row}:Q{row}")
+        ws[f"A{row}"] = "Tidak ada temuan anomali maupun duplikasi pada rekap ini."
+        ws[f"A{row}"].font = Font(italic=True, color="595959")
+        return row + 1
+
+    # ---- Header tabel detail ----
+    headers = ["No", "No Body", "Shift", "Jenis Anomali", "Keterangan"]
+    col_ranges = ["A", "B", "C", "D:F", "G:Q"]
+
+    for header_text, col_range in zip(headers, col_ranges):
+        if ":" in col_range:
+            start_col, end_col = col_range.split(":")
+            ws.merge_cells(f"{start_col}{row}:{end_col}{row}")
+            cell = ws[f"{start_col}{row}"]
+        else:
+            cell = ws[f"{col_range}{row}"]
+        cell.value = header_text
+        cell.font = FONT_HEADER
+        cell.fill = FILL_HEADER
+        cell.alignment = ALIGN_CENTER
+        cell.border = BORDER_THIN
+
+    ws.row_dimensions[row].height = 20
+    row += 1
+
+    # ---- Isi tabel detail ----
+    for i, d in enumerate(detail, start=1):
+        is_duplikat = d["rules"] == [4]
+        jenis_anomali = ", ".join(RULE_LABEL[r].split(" - ")[0] for r in d["rules"])
+
+        values = {
+            "A": i,
+            "B": d["no_body"],
+            "C": d["shift"],
+            "D:F": jenis_anomali,
+            "G:Q": d["keterangan"],
+        }
+
+        fill = FILL_ROW_DUPLIKAT if is_duplikat else FILL_ROW_ANOMALI
+
+        for col_range in col_ranges:
+            if ":" in col_range:
+                start_col, end_col = col_range.split(":")
+                ws.merge_cells(f"{start_col}{row}:{end_col}{row}")
+                cell = ws[f"{start_col}{row}"]
+            else:
+                cell = ws[f"{col_range}{row}"]
+            cell.value = values[col_range]
+            cell.fill = fill
+            cell.border = BORDER_THIN
+            cell.alignment = ALIGN_CENTER if col_range in ("A", "C") else ALIGN_LEFT
+
+        ws.row_dimensions[row].height = 28
+        row += 1
+
+    return row
+
 
 # =========================
 # STEP 1: Filter chat by DATE
@@ -159,7 +320,6 @@ def filter_orderan_from_text(text, tanggal_target):
     if buffer:
         reports.append("\n".join(buffer))
 
-    print("TOTAL REPORT FOUND:", len(reports))
     return reports
 
 
@@ -187,7 +347,6 @@ def parse_report(text):
     return data
 
 
-
 # =========================
 # STEP 3: Isi template (STABLE VERSION)
 # =========================
@@ -203,8 +362,6 @@ def isi_template(template_path, chat_text, tanggal_target, output_file):
     for row in range(DATA_START_ROW, ws.max_row + 1):
         for col in ["C", "D", "E", "F", "L", "M", "N", "O"]:
             safe_clear_cell(ws, f"{col}{row}")
-
-    print("TEMPLATE CLEARED")
 
     # HEADER tanggal
     tanggal = datetime.datetime.strptime(tanggal_target, "%d/%m/%y").date()
@@ -243,7 +400,6 @@ def isi_template(template_path, chat_text, tanggal_target, output_file):
             continue
 
         if kode_rute not in mapping:
-            print("ROUTE NOT FOUND:", kode_rute)
             continue
 
         rows = mapping[kode_rute]
@@ -260,7 +416,6 @@ def isi_template(template_path, chat_text, tanggal_target, output_file):
                     break
 
             if not target_row:
-                print("NO SLOT:", kode_rute, no_body_clean)
                 continue
 
             body_row_map[key] = target_row
@@ -285,30 +440,11 @@ def isi_template(template_path, chat_text, tanggal_target, output_file):
             ws[f"N{target_row}"] = tob_ep
             ws[f"O{target_row}"] = tob_lg
 
-        else:
-            print("SHIFT TIDAK TERBACA:", no_body_raw)
-
     # ==========================
     # ANALISIS REKAP
     # ==========================
+    hasil = analisis_rekap(ws)
+    tulis_laporan_analisis(ws, hasil, start_row=72)
 
-    anomali, duplicate, status = analisis_rekap(ws)
-
-    start = 72
-
-    ws[f"B{start}"] = "HASIL ANALISIS REKAP"
-    ws[f"B{start}"].font = Font(bold=True)
-
-    ws[f"B{start+1}"] = f"{'🟡' if anomali else '🟢'} Anomali Pelanggan : {'Tidak Ada' if anomali == 0 else str(anomali) + ' Temuan'}"
-
-    ws[f"B{start+2}"] = f"{'🔴' if duplicate else '🟢'} Duplikasi Body : {'Ada' if duplicate else 'Tidak Ada'}"
-
-    ws[f"B{start+4}"] = "Status Rekap"
-    ws[f"B{start+5}"] = status
-    ws[f"B{start+5}"].font = Font(bold=True)
-    
-    
     wb.save(output_file)
-    print("FILE SAVED:", output_file)
     return output_file
-
