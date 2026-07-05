@@ -296,16 +296,16 @@ def isi_template(template_path, chat_text, tanggal_target, output_file):
 
     start = 72
 
-    ws[f"A{start}"] = "HASIL ANALISIS REKAP"
-    ws[f"A{start}"].font = Font(bold=True)
+    ws[f"B{start}"] = "HASIL ANALISIS REKAP"
+    ws[f"B{start}"].font = Font(bold=True)
 
-    ws[f"A{start+1}"] = f"{'🟡' if anomali else '🟢'} Anomali Pelanggan : {'Tidak Ada' if anomali == 0 else str(anomali) + ' Temuan'}"
+    ws[f"B{start+1}"] = f"{'🟡' if anomali else '🟢'} Anomali Pelanggan : {'Tidak Ada' if anomali == 0 else str(anomali) + ' Temuan'}"
 
-    ws[f"A{start+2}"] = f"{'🔴' if duplicate else '🟢'} Duplikasi Body : {'Ada' if duplicate else 'Tidak Ada'}"
+    ws[f"B{start+2}"] = f"{'🔴' if duplicate else '🟢'} Duplikasi Body : {'Ada' if duplicate else 'Tidak Ada'}"
 
-    ws[f"A{start+4}"] = "Status Rekap"
-    ws[f"A{start+5}"] = status
-    ws[f"A{start+5}"].font = Font(bold=True)
+    ws[f"B{start+4}"] = "Status Rekap"
+    ws[f"B{start+5}"] = status
+    ws[f"B{start+5}"].font = Font(bold=True)
     
     
     wb.save(output_file)
