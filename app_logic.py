@@ -268,15 +268,29 @@ def tulis_laporan_analisis(ws, hasil, start_row=72):
 
 
 # =========================
-# STEP 1: Filter chat by DATE
+# STEP 1 & 2 (DIGABUNG): Filter chat by DATE + Parsing laporan
 # =========================
-def filter_orderan_from_text(text, tanggal_target):
+#
+# CATATAN PENTING (perbaikan bug "No Body ketuker"):
+# Sebelumnya laporan dipisah HANYA berdasarkan kata "Shift". Kalau ada pesan
+# lain nyelip di antara dua laporan resmi (mis. koreksi/reply singkat) yang
+# TIDAK mengandung kata "Shift", pesan itu ikut menyambung ke buffer laporan
+# sebelumnya. Karena parsing pakai dict biasa (data[key] = val), field yang
+# sama yang muncul lagi akan MENIMPA nilai sebelumnya tanpa disadari
+# (misalnya "No Body" laporan lama tertimpa "No Body" dari pesan nyelip).
+#
+# Fix: selain mendeteksi kata "Shift", kita juga menutup laporan yang sedang
+# dibangun setiap kali sebuah field yang SUDAH terisi mau ditimpa lagi.
+# Itu artinya kemunculan kedua dari field yang sama otomatis dianggap
+# sebagai awal laporan baru, sehingga laporan sebelumnya tidak lagi bisa
+# tertimpa oleh pesan lain yang menyusup.
+def extract_reports(text, tanggal_target):
     lines = text.splitlines()
-    reports = []
-    buffer = []
-    active = False
-
     date_pattern = re.compile(r"^(\d{2}/\d{2}/\d{2})\s+\d{2}\.\d{2}\s+-")
+
+    reports = []
+    current = {}
+    active = False
 
     for line in lines:
         line = line.strip()
@@ -291,49 +305,62 @@ def filter_orderan_from_text(text, tanggal_target):
             else:
                 active = True
 
-            if ":" in line:
-                msg = line.split(":", 1)[1].strip()
-            else:
-                msg = ""
+            msg = line.split(":", 1)[1].strip() if ":" in line else ""
         else:
             msg = line
 
         if not active:
             continue
 
+        msg = msg.replace("<Pesan ini diedit>", "").strip()
+
+        if not msg:
+            continue
         if msg.lower().startswith("<media"):
             continue
         if "pesan ini dihapus" in msg.lower():
             continue
 
-        # DETEKSI AWAL REPORT (fleksibel)
-        if re.search(r"\bshift\b", msg.lower()):
-            if buffer:
-                reports.append("\n".join(buffer))
-                buffer = []
-            buffer.append(msg)
+        # Deteksi kata "Shift" -> selalu dianggap awal laporan baru
+        m_shift = re.search(r"\bshift\s*:?\s*(\d)", msg.lower())
+        if m_shift:
+            if current:
+                reports.append(current)
+            current = {"shift": m_shift.group(1)}
             continue
 
-        if msg:
-            buffer.append(msg)
+        if ":" in msg:
+            key, val = msg.split(":", 1)
+            key = normalize_key(key)
+            val = val.strip()
 
-    if buffer:
-        reports.append("\n".join(buffer))
+            # Field ini sudah pernah terisi di laporan yang sedang dibangun
+            # -> ini pertanda laporan/pesan baru, tutup dulu laporan lama
+            if key in current:
+                reports.append(current)
+                current = {}
+
+            current[key] = val
+
+    if current:
+        reports.append(current)
 
     return reports
 
 
-# =========================
-# STEP 2: Parsing laporan (FIX SHIFT TOTAL)
-# =========================
-def parse_report(text):
-    data = {}
+def filter_orderan_from_text(text, tanggal_target):
+    """Dipertahankan untuk kompatibilitas mundur (tidak dipakai isi_template lagi)."""
+    return ["\n".join(f"{k}: {v}" for k, v in data.items())
+            for data in extract_reports(text, tanggal_target)]
 
+
+def parse_report(text):
+    """Dipertahankan untuk kompatibilitas mundur (tidak dipakai isi_template lagi)."""
+    data = {}
     for line in text.splitlines():
         line = line.strip()
         line = line.replace("<Pesan ini diedit>", "").strip()
 
-        # Deteksi shift langsung (paling aman)
         m_shift = re.search(r"\bshift\s*:?\s*(\d)", line.lower())
         if m_shift:
             data["shift"] = m_shift.group(1)
@@ -351,7 +378,7 @@ def parse_report(text):
 # STEP 3: Isi template (STABLE VERSION)
 # =========================
 def isi_template(template_path, chat_text, tanggal_target, output_file):
-    reports = filter_orderan_from_text(chat_text, tanggal_target)
+    reports = extract_reports(chat_text, tanggal_target)
 
     wb = load_workbook(template_path)
     ws = wb.active
@@ -382,9 +409,7 @@ def isi_template(template_path, chat_text, tanggal_target, output_file):
     # =========================
     body_row_map = {}
 
-    for rep in reports:
-        data = parse_report(rep)
-
+    for data in reports:
         shift = data.get("shift", "").strip()
         kode_rute = normalize_text(data.get("koderute", ""))
 
